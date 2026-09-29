@@ -1,10 +1,16 @@
 # SQL
 
-SQL assets used for the analytical layer.
+I will use SQL after the curated Delta layers become available through the Fabric SQL analytics endpoint.
 
-Planned content:
-- Gold layer objects
-- Dimensional model
-- Analytical queries
-- Validation queries
-- Performance-oriented SQL examples
+## Planned SQL scope
+
+- validation of Silver and Gold tables
+- CTEs and analytical joins
+- dimensional modeling
+- fact/dimension queries
+- `ROW_NUMBER`, `RANK`, `LAG` and `LEAD`
+- windowed `SUM` and `AVG`
+- KPI and aggregation queries
+- query optimization and model validation
+
+No production SQL model has been added yet because the current implementation is intentionally limited to the operational Bronze ingestion milestone.
