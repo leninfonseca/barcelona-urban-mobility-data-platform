@@ -1,0 +1,26 @@
+# Local / temporary files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets / environment
+.env
+.env.*
+*.pem
+*.key
+
+# Local data
+data/
+*.csv
+*.parquet
