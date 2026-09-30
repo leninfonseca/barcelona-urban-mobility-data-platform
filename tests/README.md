@@ -1,8 +1,8 @@
 # Tests
 
-I am keeping validation close to each transformation instead of adding placeholder tests before the corresponding data layer exists.
+I keep validation close to each transformation so data-quality rules execute with the pipeline logic they protect.
 
-## Current validation
+## Bronze validation
 
 The Bronze milestone is validated through:
 
@@ -11,15 +11,33 @@ The Bronze milestone is validated through:
 - successful raw JSON creation in OneLake
 - expected CKAN response structure
 
-## Planned automated tests
+## Silver validation
 
-As Silver and Gold become operational I will add:
+The first Silver notebook contains executable assertions for the current source:
 
-- schema assertions
-- required-column checks
-- null thresholds
-- duplicate detection
-- accepted ranges/domains
-- row-count reconciliation
-- referential-integrity checks
+- output must not be empty
+- `source_id` must remain unique
+- critical columns must not contain nulls
+- `value` must not contain negative values
+- Bronze and Silver row counts are reconciled
+
+Current run:
+
+```text
+Bronze records: 100
+Silver records: 100
+All Silver data quality checks passed.
+```
+
+These checks run before the curated Delta table is considered valid.
+
+## Planned tests
+
+As the platform grows I will add:
+
+- schema contracts
+- accepted ranges and domains
+- malformed-record quarantine
 - freshness checks
+- referential-integrity checks
+- Gold KPI reconciliation

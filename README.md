@@ -4,7 +4,7 @@ I am building an end-to-end Data Engineering platform in Microsoft Fabric around
 
 ## Current implementation
 
-I have completed the first working ingestion path in Fabric:
+The first end-to-end path from source to Silver is operational:
 
 - Microsoft Fabric workspace: `Barcelona Urban Mobility`
 - Lakehouse: `barcelona_mobility_lakehouse`
@@ -14,8 +14,10 @@ I have completed the first working ingestion path in Fabric:
 - Authentication: anonymous
 - Bronze storage: OneLake / Lakehouse Files
 - Raw output: `Files/bronze/opendata/district_data/district_data.json`
+- PySpark notebook: `nb_bronze_to_silver_districts`
+- Silver Delta table: `silver_district_context`
 
-The current source is a contextual Open Data Barcelona resource used to validate the ingestion pattern and provide district/neighborhood-level reference data. Mobility-specific sources will be added on top of the same ingestion architecture.
+The current source is a contextual Open Data Barcelona resource used to validate the ingestion and transformation pattern and to provide district/neighborhood-level reference data. Mobility-specific sources will be added on top of the same architecture.
 
 ## Architecture
 
@@ -42,15 +44,38 @@ pl_ingest_mobility_bronze
 cp_ingest_mobility_bronze
           |
           v
-barcelona_mobility_lakehouse
+Files/bronze/opendata/district_data/district_data.json
           |
           v
-Files/bronze/opendata/district_data/district_data.json
+nb_bronze_to_silver_districts
+          |
+          v
+silver_district_context
 ```
+
+## Bronze milestone
+
+The Bronze pipeline is working end to end. Fabric retrieves the CKAN JSON response and stores the raw payload without flattening or business transformations.
+
+## Silver milestone
+
+The first Bronze-to-Silver transformation is implemented in PySpark. The notebook:
+
+- reads the multiline raw JSON
+- extracts and explodes `result.records`
+- flattens the nested payload
+- normalizes column names
+- casts identifiers and analytical values explicitly
+- removes exact duplicates
+- adds `silver_processed_at`
+- validates row preservation, uniqueness, critical nulls and invalid negative values
+- persists the curated result as a Delta table
+
+The current run preserved all 100 source records and all automated Silver checks passed.
 
 ## Technical scope
 
-I am using this project to implement:
+This project covers:
 
 - REST/API ingestion with Fabric Data Factory
 - Pipeline orchestration and monitoring
@@ -58,10 +83,10 @@ I am using this project to implement:
 - Medallion architecture: Bronze, Silver and Gold
 - Raw JSON preservation in Bronze
 - PySpark transformations in Fabric notebooks
-- Delta Lake tables for Silver and Gold
+- Delta Lake tables for curated layers
+- Automated data-quality assertions
 - SQL modeling and analytical queries
 - Incremental loading and watermarks
-- Automated data-quality checks
 - Engineering decisions and operational documentation
 
 ## Repository structure
@@ -80,18 +105,17 @@ I am using this project to implement:
 
 ## Evidence
 
-The repository is prepared for the Fabric screenshots that document the implementation:
+Implementation screenshots are stored under `assets/images/`. Bronze screenshots use the following filenames:
 
-![Fabric Lakehouse](assets/images/01-fabric-lakehouse.png)
+- `01-fabric-lakehouse.png`
+- `02-rest-source-preview.png`
+- `03-bronze-pipeline-run.png`
+- `04-bronze-file.png`
 
-![REST source preview](assets/images/02-rest-source-preview.png)
-
-![Bronze pipeline execution](assets/images/03-bronze-pipeline-run.png)
-
-![Bronze file in OneLake](assets/images/04-bronze-file.png)
+Silver evidence will be added after the remaining implementation screenshots are captured.
 
 ## Status
 
-**In development — Bronze ingestion operational.**
+**In development — Bronze ingestion and the first Silver Delta transformation are operational.**
 
-Next implementation milestone: PySpark normalization of the raw CKAN JSON into a Silver Delta table.
+Next milestone: add a mobility-specific source and transform it through Bronze and Silver before defining the first Gold analytical model.

@@ -2,36 +2,49 @@
 
 I am introducing data-quality controls incrementally as each layer becomes operational.
 
-## Bronze validation completed
+## Bronze validation
 
-For the first REST ingestion I validated:
+The first REST ingestion validates that:
 
-- REST connection succeeds from Fabric
-- CKAN response returns `success: true`
-- expected schema metadata is present in `result.fields`
+- the REST connection succeeds from Fabric
+- the CKAN response returns `success: true`
+- schema metadata is present in `result.fields`
 - source records are returned in the payload
-- pipeline execution completes
-- raw JSON is materialized in the expected OneLake path
+- the pipeline execution completes successfully
+- the raw JSON is materialized in the expected OneLake path
 
-## Silver checks planned
+## Silver validation
 
-The first PySpark transformation will add automated checks for:
+The first PySpark transformation includes executable checks for:
 
-- required columns
-- explicit data types
-- null rates
-- duplicate records
-- valid district and neighborhood identifiers
-- row counts before and after transformation
-- malformed records
-- ingestion timestamp and source lineage
+- non-empty output
+- row-count reconciliation between Bronze records and Silver
+- duplicate detection using `source_id`
+- null detection in critical fields
+- invalid negative values in the analytical `value` column
+- explicit type casting
+- processing metadata through `silver_processed_at`
 
-## Gold checks planned
+Current validated result:
 
-Analytical models will add:
+```text
+Bronze records: 100
+Silver records: 100
+Duplicate source_id values: 0
+Rows with nulls in critical columns: 0
+Rows with negative values: 0
+All Silver data quality checks passed.
+```
 
-- uniqueness of dimension keys
-- referential integrity between facts and dimensions
+Assertions stop notebook execution when these core rules fail instead of allowing bad data to be silently persisted.
+
+## Planned controls
+
+As additional sources and Gold models are added, I will extend validation with:
+
+- required-column and schema contracts
 - accepted value/domain checks
-- KPI reconciliation
+- malformed-record handling
 - freshness thresholds
+- referential integrity between facts and dimensions
+- KPI reconciliation

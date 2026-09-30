@@ -1,33 +1,43 @@
 # Fabric / PySpark Notebooks
 
-The Bronze ingestion is already handled by Fabric Data Factory, so I am using notebooks primarily for transformation, quality and curated-layer logic.
+Fabric Data Factory handles Bronze ingestion. I use notebooks for transformation, quality and curated-layer logic.
 
-## Notebook plan
+## Implemented
 
-1. `01_bronze_to_silver`
-   - read `district_data.json`
-   - inspect the nested CKAN payload
-   - extract `result.records`
-   - normalize schema and column names
-   - cast data types
-   - handle nulls and duplicates
-   - write the first Silver Delta table
+### nb_bronze_to_silver_districts
 
-2. `02_data_quality`
-   - reusable validation checks
-   - invalid-record analysis
-   - row-count and schema assertions
+The first notebook is operational and performs the full Bronze-to-Silver transformation for the contextual district dataset.
 
-3. `03_silver_enrichment`
-   - joins between mobility and contextual/geographic datasets
-   - window functions and derived attributes
+It:
 
-4. `04_gold_model`
-   - business-ready aggregations
-   - dimensions and facts
+- reads `Files/bronze/opendata/district_data/district_data.json`
+- parses the multiline CKAN JSON envelope
+- extracts and explodes `result.records`
+- flattens the record structure
+- renames columns to a consistent English schema
+- casts source identifiers and values explicitly
+- removes exact duplicates
+- adds `silver_processed_at`
+- performs row-count, uniqueness, null and range assertions
+- writes `silver_district_context` as a Delta table
+- reads the Delta table back for validation
 
-5. `05_incremental_load`
-   - watermark/incremental patterns
-   - Delta MERGE/upsert logic
+A repository-friendly PySpark version is stored in `nb_bronze_to_silver_districts.py`.
 
-I will export the actual Fabric notebooks here as each implementation milestone is completed.
+## Planned notebooks
+
+1. `nb_bronze_to_silver_<mobility_source>`
+   - normalize the first mobility-specific source
+   - enforce source-specific quality rules
+   - persist a curated Delta table
+
+2. `nb_silver_enrichment`
+   - join mobility and contextual/geographic datasets
+   - apply window functions and derived attributes
+
+3. `nb_gold_model`
+   - build business-ready aggregations, dimensions and facts
+
+4. `nb_incremental_load`
+   - implement watermark patterns
+   - add Delta MERGE/upsert logic

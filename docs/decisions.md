@@ -12,13 +12,13 @@ I chose Bronze, Silver and Gold to separate source preservation, data standardiz
 
 **Status:** Accepted
 
-I will use Delta tables for Silver and Gold so curated datasets can support reliable schema handling, transactional writes and future MERGE/upsert patterns.
+I use Delta tables for Silver and will use them for Gold so curated datasets can support reliable schema handling, transactional writes and future MERGE/upsert patterns.
 
 ## ADR-003 — Raw API payloads in Lakehouse Files
 
 **Status:** Accepted
 
-I store the first REST payload under Lakehouse `Files/bronze` rather than immediately converting it into a table. This preserves the original source response before business transformations are applied.
+I store REST payloads under Lakehouse `Files/bronze` rather than immediately converting them into tables. This preserves the original source response before business transformations are applied.
 
 Current object:
 
@@ -38,4 +38,16 @@ I use a Fabric pipeline and Copy activity for source ingestion so extraction can
 
 I tested Bicing's public GBFS API first, but the upstream API returned a temporary HTTP 503 block when called through Fabric. I switched the first operational ingestion to Barcelona Open Data's CKAN API so the Bronze architecture could be validated independently of that upstream limitation.
 
-This decision does not remove Bicing from the target architecture; it only decouples the first pipeline milestone from the temporary API behavior.
+This decision does not remove Bicing from the target architecture; it only decouples the first pipeline milestone from temporary upstream behavior.
+
+## ADR-006 — Preserve source codes as strings in Silver
+
+**Status:** Accepted
+
+Fields such as district, neighborhood, census section and nationality codes may contain numeric-looking values, but semantically they are identifiers. I therefore keep them as strings in Silver to avoid accidental arithmetic and to preserve identifier semantics.
+
+## ADR-007 — Name the first curated table by its actual grain
+
+**Status:** Accepted
+
+I use `silver_district_context` instead of `silver_districts` because the source contains multiple observations per district across census sections, neighborhoods and nationality categories. The table name should describe the data accurately rather than imply one row per district.
