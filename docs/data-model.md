@@ -1,16 +1,19 @@
 # Data Model
 
-I am evolving the model layer by layer instead of defining the final schema before inspecting the real sources.
+I evolve the model layer by layer after inspecting the real source structures.
 
 ## Bronze
 
-Current raw object:
+Current raw objects:
 
 ```text
 Files/bronze/opendata/district_data/district_data.json
+Files/bronze/citybikes/bicing/bicing_snapshot.json
 ```
 
-The CKAN response contains this high-level structure:
+### Context source
+
+The CKAN response contains:
 
 ```text
 root
@@ -23,19 +26,36 @@ root
     └── ...
 ```
 
-I keep this envelope intact in Bronze so source metadata and raw records remain reproducible.
+### Bicing source
+
+The CityBikes response contains:
+
+```text
+root
+└── network
+    ├── id
+    ├── name
+    ├── location
+    ├── company
+    ├── ebikes
+    └── stations
+        ├── id
+        ├── name
+        ├── latitude
+        ├── longitude
+        ├── timestamp
+        ├── free_bikes
+        ├── empty_slots
+        └── extra
+```
+
+I keep both source envelopes intact in Bronze.
 
 ## Silver
 
-The first curated table is:
+### silver_district_context
 
-```text
-silver_district_context
-```
-
-Its grain is contextual demographic/geographic observation by source record, not one row per district.
-
-Current columns:
+The first curated table is operational.
 
 | Column | Type | Purpose |
 |---|---|---|
@@ -51,10 +71,26 @@ Current columns:
 | reference_date | timestamp | Source reference timestamp |
 | silver_processed_at | timestamp | Silver processing timestamp |
 
-Geographic and categorical codes are stored as strings because they are identifiers rather than measures.
+### silver_bicing_station_status
 
-The initial transformation preserved all 100 records retrieved from the source sample and removed no valid rows.
+This table is the next implementation target.
+
+The intended grain is **one Bicing station observation per source snapshot**.
+
+Candidate fields, subject to schema validation in PySpark, include:
+
+- station_id
+- station_name
+- latitude
+- longitude
+- source_timestamp
+- free_bikes
+- empty_slots
+- operational attributes from `extra`
+- silver_processed_at
+
+I will finalize types and accepted ranges only after inspecting the actual Spark schema.
 
 ## Gold
 
-I will define the Gold model after mobility-specific sources are available and the common analytical grain is clear. Candidate entities include date, location, transport/mobility source and mobility observations.
+I will define the Gold model after the Bicing Silver table is operational and historical snapshot behavior is established.

@@ -1,10 +1,12 @@
 # Data Quality
 
-I am introducing data-quality controls incrementally as each layer becomes operational.
+I introduce data-quality controls incrementally as each layer becomes operational.
 
 ## Bronze validation
 
-The first REST ingestion validates that:
+### Context source
+
+I validated that:
 
 - the REST connection succeeds from Fabric
 - the CKAN response returns `success: true`
@@ -13,9 +15,20 @@ The first REST ingestion validates that:
 - the pipeline execution completes successfully
 - the raw JSON is materialized in the expected OneLake path
 
+### Bicing source
+
+I validated that:
+
+- the CityBikes REST connection succeeds from Fabric
+- the response identifies the `bicing` network
+- `network.stations` is present in the payload
+- station-level availability fields are returned
+- the pipeline execution completes
+- `bicing_snapshot.json` is readable from the Bronze destination
+
 ## Silver validation
 
-The first PySpark transformation includes executable checks for:
+The contextual PySpark transformation includes executable checks for:
 
 - non-empty output
 - row-count reconciliation between Bronze records and Silver
@@ -36,13 +49,13 @@ Rows with negative values: 0
 All Silver data quality checks passed.
 ```
 
-Assertions stop notebook execution when these core rules fail instead of allowing bad data to be silently persisted.
+The Bicing Silver transformation will add source-specific checks for station identifier completeness, coordinate validity, availability ranges and timestamp parsing.
 
 ## Planned controls
 
 As additional sources and Gold models are added, I will extend validation with:
 
-- required-column and schema contracts
+- schema contracts
 - accepted value/domain checks
 - malformed-record handling
 - freshness thresholds

@@ -1,12 +1,14 @@
 # Architecture
 
-I am using a Medallion architecture in Microsoft Fabric so raw ingestion, standardized data and analytical data remain separated.
+I use a Medallion architecture in Microsoft Fabric to separate source preservation, data standardization and analytical serving.
 
 ```mermaid
 flowchart TD
-    A[Barcelona Open Data / External APIs] --> B[Fabric Data Factory]
-    B --> C[Bronze - OneLake Files]
-    C --> D[Fabric Notebook / PySpark]
+    A1[Barcelona Open Data CKAN] --> B1[Fabric Data Factory]
+    A2[CityBikes Bicing API] --> B2[Fabric Data Factory]
+    B1 --> C[Bronze - OneLake Files]
+    B2 --> C
+    C --> D[Fabric Notebooks / PySpark]
     D --> E[Silver - Delta Tables]
     E --> F[PySpark + SQL]
     F --> G[Gold - Dimensional / Analytical Layer]
@@ -16,31 +18,38 @@ flowchart TD
 
 ## Bronze
 
-I preserve source responses with minimal modification so the original payload remains available for replay, auditing and troubleshooting.
+I preserve API responses with minimal modification so original payloads remain available for replay, auditing and troubleshooting.
 
-Current object:
+Current Bronze objects:
 
 ```text
 Files/bronze/opendata/district_data/district_data.json
+Files/bronze/citybikes/bicing/bicing_snapshot.json
 ```
+
+The district source validates the contextual ingestion pattern. The Bicing source introduces operational mobility observations at station level.
 
 ## Silver
 
 The first Silver transformation is implemented in `nb_bronze_to_silver_districts`.
 
-The notebook reads the raw CKAN envelope, extracts `result.records`, flattens the nested records, standardizes the schema, performs quality checks and writes:
+It extracts `result.records`, flattens the nested CKAN response, standardizes names and types, executes quality checks and writes:
 
 ```text
 silver_district_context
 ```
 
-as a Delta table in the Fabric Lakehouse.
+The next transformation will read `network.stations` from the Bicing Bronze snapshot and persist:
 
-The table is intentionally named `silver_district_context` because the source grain includes census section, neighborhood, district and nationality attributes rather than one row per district.
+```text
+silver_bicing_station_status
+```
+
+The target grain is one station observation per source snapshot.
 
 ## Gold
 
-I will build the Gold layer once mobility-specific sources are incorporated and their analytical grain is clear. Gold will expose business-ready mobility entities, dimensions, facts and KPIs for SQL and BI consumption.
+I will define the Gold model after the Bicing Silver dataset is operational and the analytical grain is validated. Gold will expose business-ready mobility entities, dimensions, facts and KPIs for SQL and BI consumption.
 
 ## Current Fabric components
 
@@ -48,13 +57,17 @@ I will build the Gold layer once mobility-specific sources are incorporated and 
 |---|---|---|
 | Workspace | Barcelona Urban Mobility | Implemented |
 | Lakehouse | barcelona_mobility_lakehouse | Implemented |
-| Bronze pipeline | pl_ingest_mobility_bronze | Implemented |
-| Copy activity | cp_ingest_mobility_bronze | Implemented |
-| Bronze raw JSON | district_data.json | Implemented |
-| Silver notebook | nb_bronze_to_silver_districts | Implemented |
-| Silver Delta table | silver_district_context | Implemented |
-| Silver quality assertions | Notebook assertions | Implemented |
-| Mobility-specific source | Pending | Next |
+| Context pipeline | pl_ingest_mobility_bronze | Implemented |
+| Context copy activity | cp_ingest_mobility_bronze | Implemented |
+| Context Bronze JSON | district_data.json | Implemented |
+| Context Silver notebook | nb_bronze_to_silver_districts | Implemented |
+| Context Silver Delta table | silver_district_context | Implemented |
+| Context Silver assertions | Notebook assertions | Implemented |
+| Bicing pipeline | pl_ingest_bicing_bronze | Implemented |
+| Bicing copy activity | cp_ingest_bicing_bronze | Implemented |
+| Bicing Bronze JSON | bicing_snapshot.json | Implemented |
+| Bicing Silver notebook | nb_bronze_to_silver_bicing | Next |
+| Bicing Silver Delta table | silver_bicing_station_status | Planned |
 | Gold model | Pending | Planned |
 
 ## Architecture image

@@ -1,30 +1,40 @@
 # Barcelona Urban Mobility Data Platform
 
-I am building an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public data, with the goal of covering ingestion, orchestration, Lakehouse design, PySpark transformations, SQL modeling, data quality and analytical serving.
+I am building an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public data, covering ingestion, orchestration, Lakehouse design, PySpark transformations, Delta Lake, data quality, SQL modeling and analytical serving.
 
 ## Current implementation
 
-The first end-to-end path from source to Silver is operational:
+Two Bronze ingestion paths are operational and the first source has already been transformed into Silver.
 
-- Microsoft Fabric workspace: `Barcelona Urban Mobility`
-- Lakehouse: `barcelona_mobility_lakehouse`
-- Fabric Data Factory pipeline: `pl_ingest_mobility_bronze`
-- Copy activity: `cp_ingest_mobility_bronze`
+### Contextual district data
+
 - Source: Barcelona Open Data CKAN REST API
-- Authentication: anonymous
-- Bronze storage: OneLake / Lakehouse Files
-- Raw output: `Files/bronze/opendata/district_data/district_data.json`
+- Pipeline: `pl_ingest_mobility_bronze`
+- Copy activity: `cp_ingest_mobility_bronze`
+- Bronze file: `Files/bronze/opendata/district_data/district_data.json`
 - PySpark notebook: `nb_bronze_to_silver_districts`
 - Silver Delta table: `silver_district_context`
+- Silver quality assertions: operational
 
-The current source is a contextual Open Data Barcelona resource used to validate the ingestion and transformation pattern and to provide district/neighborhood-level reference data. Mobility-specific sources will be added on top of the same architecture.
+### Bicing station availability
+
+- Source: CityBikes REST API
+- Network: `bicing`
+- Pipeline: `pl_ingest_bicing_bronze`
+- Copy activity: `cp_ingest_bicing_bronze`
+- Bronze file: `Files/bronze/citybikes/bicing/bicing_snapshot.json`
+- Silver transformation: next implementation step
+
+The district dataset provides geographic and contextual attributes. The Bicing source introduces operational mobility data with station-level availability, coordinates and source timestamps.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[Barcelona Open Data / APIs] --> B[Fabric Data Factory Pipeline]
-    B --> C[Bronze - OneLake Files]
+    A1[Barcelona Open Data CKAN] --> B1[Fabric Pipeline]
+    A2[CityBikes Bicing API] --> B2[Fabric Pipeline]
+    B1 --> C[Bronze - OneLake Files]
+    B2 --> C
     C --> D[PySpark Notebooks]
     D --> E[Silver - Delta Tables]
     E --> F[PySpark + SQL]
@@ -32,34 +42,40 @@ flowchart LR
     G --> H[SQL Analytics Endpoint / BI]
 ```
 
-### Implemented flow
+## Implemented flows
 
 ```text
 Barcelona Open Data CKAN API
-          |
-          v
+        ↓
 pl_ingest_mobility_bronze
-          |
-          v
-cp_ingest_mobility_bronze
-          |
-          v
+        ↓
 Files/bronze/opendata/district_data/district_data.json
-          |
-          v
+        ↓
 nb_bronze_to_silver_districts
-          |
-          v
+        ↓
 silver_district_context
+```
+
+```text
+CityBikes Bicing API
+        ↓
+pl_ingest_bicing_bronze
+        ↓
+Files/bronze/citybikes/bicing/bicing_snapshot.json
+        ↓
+nb_bronze_to_silver_bicing
+        ↓
+silver_bicing_station_status
+        (next)
 ```
 
 ## Bronze milestone
 
-The Bronze pipeline is working end to end. Fabric retrieves the CKAN JSON response and stores the raw payload without flattening or business transformations.
+The Bronze layer now contains two independent REST ingestion paths. I preserve source payloads before applying curated transformations so they remain available for replay, auditing and troubleshooting.
 
 ## Silver milestone
 
-The first Bronze-to-Silver transformation is implemented in PySpark. The notebook:
+The first Bronze-to-Silver transformation is operational for the contextual district source. The notebook:
 
 - reads the multiline raw JSON
 - extracts and explodes `result.records`
@@ -71,23 +87,26 @@ The first Bronze-to-Silver transformation is implemented in PySpark. The noteboo
 - validates row preservation, uniqueness, critical nulls and invalid negative values
 - persists the curated result as a Delta table
 
-The current run preserved all 100 source records and all automated Silver checks passed.
+The validated run preserved all 100 source records and passed all implemented Silver assertions.
+
+The next Silver implementation will normalize Bicing station observations from `network.stations`.
 
 ## Technical scope
 
-This project covers:
+The project covers:
 
 - REST/API ingestion with Fabric Data Factory
-- Pipeline orchestration and monitoring
+- multiple independent ingestion sources
+- pipeline orchestration and monitoring
 - OneLake and Fabric Lakehouse storage
 - Medallion architecture: Bronze, Silver and Gold
-- Raw JSON preservation in Bronze
-- PySpark transformations in Fabric notebooks
+- raw JSON preservation in Bronze
+- nested JSON normalization with PySpark
 - Delta Lake tables for curated layers
-- Automated data-quality assertions
+- automated data-quality assertions
 - SQL modeling and analytical queries
-- Incremental loading and watermarks
-- Engineering decisions and operational documentation
+- incremental loading and historical snapshots
+- engineering decisions and operational documentation
 
 ## Repository structure
 
@@ -105,17 +124,19 @@ This project covers:
 
 ## Evidence
 
-Implementation screenshots are stored under `assets/images/`. Bronze screenshots use the following filenames:
+Implementation screenshots are stored under `assets/images/`.
+
+Current Bronze evidence:
 
 - `01-fabric-lakehouse.png`
 - `02-rest-source-preview.png`
 - `03-bronze-pipeline-run.png`
 - `04-bronze-file.png`
 
-Silver evidence will be added after the remaining implementation screenshots are captured.
+Additional Bicing and Silver evidence will be added as the corresponding implementation views are captured.
 
 ## Status
 
-**In development — Bronze ingestion and the first Silver Delta transformation are operational.**
+**In development — contextual Bronze-to-Silver is operational and Bicing Bronze ingestion is operational.**
 
-Next milestone: add a mobility-specific source and transform it through Bronze and Silver before defining the first Gold analytical model.
+Next milestone: transform the Bicing station snapshot into `silver_bicing_station_status`, add source-specific quality checks and prepare the snapshot history for incremental processing.
