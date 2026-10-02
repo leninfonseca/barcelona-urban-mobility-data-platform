@@ -4,7 +4,7 @@ I am building an end-to-end Data Engineering platform in Microsoft Fabric around
 
 ## Current implementation
 
-Two Bronze ingestion paths are operational and the first source has already been transformed into Silver.
+Two independent REST ingestion paths are operational and both now reach Silver.
 
 ### Contextual district data
 
@@ -23,16 +23,20 @@ Two Bronze ingestion paths are operational and the first source has already been
 - Pipeline: `pl_ingest_bicing_bronze`
 - Copy activity: `cp_ingest_bicing_bronze`
 - Bronze file: `Files/bronze/citybikes/bicing/bicing_snapshot.json`
-- Silver transformation: next implementation step
+- PySpark notebook: `nb_bronze_to_silver_bicing`
+- Silver Delta table: `silver_bicing_station_status`
+- Current validated row count: 544
+- Critical Silver quality assertions: passed
+- Non-critical source inconsistency tracking: implemented
 
-The district dataset provides geographic and contextual attributes. The Bicing source introduces operational mobility data with station-level availability, coordinates and source timestamps.
+The district dataset provides contextual geographic attributes. The Bicing source provides station-level availability, coordinates, bike-type breakdowns and source timestamps.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A1[Barcelona Open Data CKAN] --> B1[Fabric Pipeline]
-    A2[CityBikes Bicing API] --> B2[Fabric Pipeline]
+    A1[Barcelona Open Data CKAN] --> B1[Fabric Data Factory Pipeline]
+    A2[CityBikes Bicing API] --> B2[Fabric Data Factory Pipeline]
     B1 --> C[Bronze - OneLake Files]
     B2 --> C
     C --> D[PySpark Notebooks]
@@ -66,44 +70,51 @@ Files/bronze/citybikes/bicing/bicing_snapshot.json
 nb_bronze_to_silver_bicing
         ↓
 silver_bicing_station_status
-        (next)
 ```
-
-## Bronze milestone
-
-The Bronze layer now contains two independent REST ingestion paths. I preserve source payloads before applying curated transformations so they remain available for replay, auditing and troubleshooting.
 
 ## Silver milestone
 
-The first Bronze-to-Silver transformation is operational for the contextual district source. The notebook:
+The Bicing transformation now:
 
-- reads the multiline raw JSON
-- extracts and explodes `result.records`
-- flattens the nested payload
-- normalizes column names
-- casts identifiers and analytical values explicitly
-- removes exact duplicates
-- adds `silver_processed_at`
-- validates row preservation, uniqueness, critical nulls and invalid negative values
+- extracts and explodes `network.stations`
+- normalizes station-level fields
+- parses source timestamps explicitly
+- casts identifiers and measures
+- derives station capacity
+- removes duplicate station snapshots
+- validates critical nulls, coordinates and availability values
+- classifies bike-breakdown inconsistencies as non-critical warnings
+- adds `bike_breakdown_valid` for traceability
 - persists the curated result as a Delta table
 
-The validated run preserved all 100 source records and passed all implemented Silver assertions.
+The validated Bicing Silver table contains 544 station observations.
 
-The next Silver implementation will normalize Bicing station observations from `network.stations`.
+## Data quality and troubleshooting
+
+Implementation issues that affected parsing or data-quality behavior are documented separately so technical decisions remain traceable.
+
+See [Troubleshooting](docs/troubleshooting.md).
+
+The two documented cases are:
+
+- CityBikes timestamp parsing failure caused by a non-standard timezone suffix combination.
+- A bike-type availability inconsistency in one offline station record, handled as a warning rather than a destructive correction.
 
 ## Technical scope
 
-The project covers:
+The project currently covers:
 
 - REST/API ingestion with Fabric Data Factory
 - multiple independent ingestion sources
 - pipeline orchestration and monitoring
 - OneLake and Fabric Lakehouse storage
-- Medallion architecture: Bronze, Silver and Gold
+- Medallion architecture
 - raw JSON preservation in Bronze
 - nested JSON normalization with PySpark
+- explicit timestamp parsing
 - Delta Lake tables for curated layers
-- automated data-quality assertions
+- critical assertions and non-critical quality flags
+- source anomaly investigation
 - SQL modeling and analytical queries
 - incremental loading and historical snapshots
 - engineering decisions and operational documentation
@@ -117,6 +128,7 @@ The project covers:
 ├── pipelines/
 ├── sql/
 ├── docs/
+│   └── troubleshooting.md
 ├── tests/
 └── assets/
     └── images/
@@ -124,19 +136,24 @@ The project covers:
 
 ## Evidence
 
-Implementation screenshots are stored under `assets/images/`.
+Implementation evidence is stored under `assets/images/`.
 
-Current Bronze evidence:
+Current evidence covers:
 
-- `01-fabric-lakehouse.png`
-- `02-rest-source-preview.png`
-- `03-bronze-pipeline-run.png`
-- `04-bronze-file.png`
+- contextual Bronze ingestion
+- contextual Silver table and quality checks
+- Bicing REST source preview
+- Bicing Bronze pipeline execution
+- Bicing Bronze file persistence
 
-Additional Bicing and Silver evidence will be added as the corresponding implementation views are captured.
+The next three screenshots are reserved for the completed Bicing Silver milestone and troubleshooting cases:
+
+- `10-bicing-timestamp-parsing.png`
+- `11-bicing-offline-quality-anomaly.png`
+- `12-bicing-silver-table.png`
 
 ## Status
 
-**In development — contextual Bronze-to-Silver is operational and Bicing Bronze ingestion is operational.**
+**In development — both current sources reach Silver successfully.**
 
-Next milestone: transform the Bicing station snapshot into `silver_bicing_station_status`, add source-specific quality checks and prepare the snapshot history for incremental processing.
+Next milestone: preserve historical Bicing snapshots, add incremental processing and prepare the first Gold analytical model.

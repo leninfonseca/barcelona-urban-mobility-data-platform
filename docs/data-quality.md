@@ -21,24 +21,22 @@ I validated that:
 
 - the CityBikes REST connection succeeds from Fabric
 - the response identifies the `bicing` network
-- `network.stations` is present in the payload
+- `network.stations` is present
 - station-level availability fields are returned
 - the pipeline execution completes
-- `bicing_snapshot.json` is readable from the Bronze destination
+- `bicing_snapshot.json` is readable from Bronze
 
-## Silver validation
+## Context Silver validation
 
-The contextual PySpark transformation includes executable checks for:
+The contextual transformation validates:
 
 - non-empty output
-- row-count reconciliation between Bronze records and Silver
-- duplicate detection using `source_id`
-- null detection in critical fields
-- invalid negative values in the analytical `value` column
-- explicit type casting
-- processing metadata through `silver_processed_at`
+- row-count reconciliation
+- duplicate `source_id` values
+- critical nulls
+- negative analytical values
 
-Current validated result:
+Validated result:
 
 ```text
 Bronze records: 100
@@ -49,15 +47,44 @@ Rows with negative values: 0
 All Silver data quality checks passed.
 ```
 
-The Bicing Silver transformation will add source-specific checks for station identifier completeness, coordinate validity, availability ranges and timestamp parsing.
+## Bicing Silver validation
+
+The Bicing transformation validates:
+
+- non-empty output
+- uniqueness of `station_id + source_timestamp`
+- non-null station ID, timestamp and coordinates
+- non-null availability values
+- non-negative bike and slot counts
+- valid latitude and longitude ranges
+- consistency of the bike-type breakdown as a non-critical quality signal
+
+Validated result:
+
+```text
+Total rows: 544
+Duplicate station snapshots: 0
+Rows with critical nulls: 0
+Rows with invalid availability: 0
+Rows with invalid coordinates: 0
+Rows with inconsistent bike breakdown: 1
+```
+
+The bike-breakdown inconsistency is preserved through `bike_breakdown_valid` and reported as a warning. It does not stop the transformation because the source contract does not establish the relationship as a guaranteed invariant.
+
+Critical checks still fail the notebook through assertions.
+
+## Troubleshooting
+
+The timestamp parsing failure and bike-breakdown anomaly are documented in [Troubleshooting](troubleshooting.md).
 
 ## Planned controls
 
-As additional sources and Gold models are added, I will extend validation with:
+The historical and Gold layers will add:
 
+- freshness thresholds
+- historical snapshot completeness
 - schema contracts
 - accepted value/domain checks
-- malformed-record handling
-- freshness thresholds
-- referential integrity between facts and dimensions
+- referential integrity
 - KPI reconciliation

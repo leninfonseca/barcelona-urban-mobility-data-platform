@@ -10,51 +10,50 @@ This notebook performs the full Bronze-to-Silver transformation for the contextu
 
 It:
 
-- reads `Files/bronze/opendata/district_data/district_data.json`
-- parses the multiline CKAN JSON envelope
+- reads the CKAN Bronze JSON
 - extracts and explodes `result.records`
-- flattens the record structure
-- renames columns to a consistent English schema
-- casts source identifiers and values explicitly
-- removes exact duplicates
-- adds `silver_processed_at`
-- performs row-count, uniqueness, null and range assertions
-- writes `silver_district_context` as a Delta table
-- reads the Delta table back for validation
+- normalizes names and types
+- validates critical data-quality rules
+- writes `silver_district_context` as Delta
 
 A repository-friendly PySpark version is stored in `nb_bronze_to_silver_districts.py`.
 
-## Next notebook
-
 ### nb_bronze_to_silver_bicing
 
-The Bicing Bronze payload is now available at:
+This notebook performs the Bronze-to-Silver transformation for CityBikes Bicing station data.
 
-```text
-Files/bronze/citybikes/bicing/bicing_snapshot.json
-```
+It:
 
-The next notebook will:
+- reads `Files/bronze/citybikes/bicing/bicing_snapshot.json`
+- extracts and explodes `network.stations`
+- flattens station and `extra` fields
+- normalizes identifiers and measures
+- explicitly parses the source timestamp
+- derives `station_capacity`
+- removes duplicate station snapshots by `station_id + source_timestamp`
+- separates critical assertions from non-critical warnings
+- adds `bike_breakdown_valid`
+- writes `silver_bicing_station_status` as Delta
+- validates the persisted table
 
-- read the nested CityBikes response
-- inspect the inferred Spark schema
-- extract and explode `network.stations`
-- normalize station identifiers, names, coordinates and availability measures
-- convert source timestamps explicitly
-- add processing metadata
-- validate station IDs, coordinates, availability values and row counts
-- persist `silver_bicing_station_status` as a Delta table
+The current validated output contains 544 rows.
+
+A repository-friendly PySpark version is stored in `nb_bronze_to_silver_bicing.py`.
 
 ## Planned notebooks
 
-1. `nb_silver_enrichment`
+1. `nb_bicing_snapshot_history`
+   - preserve multiple station snapshots
+   - add deterministic ingestion timestamps/partitions
+   - prevent duplicate reprocessing
+
+2. `nb_silver_enrichment`
    - join mobility and contextual/geographic datasets
    - apply window functions and derived attributes
 
-2. `nb_gold_model`
-   - build business-ready aggregations, dimensions and facts
+3. `nb_gold_model`
+   - build business-ready dimensions, facts and KPIs
 
-3. `nb_incremental_load`
-   - preserve historical Bicing snapshots
-   - implement watermark patterns
+4. `nb_incremental_load`
+   - implement incremental patterns
    - add Delta MERGE/upsert logic where appropriate

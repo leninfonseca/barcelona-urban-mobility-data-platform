@@ -1,43 +1,53 @@
 # Tests
 
-I keep validation close to each transformation so data-quality rules execute with the pipeline logic they protect.
+I keep validation close to each transformation so data-quality rules execute with the logic they protect.
 
 ## Bronze validation
 
-The Bronze milestone is validated through:
+The Bronze layer is validated through:
 
-- REST source preview
-- successful pipeline execution
-- successful raw JSON creation in OneLake
-- expected CKAN response structure
+- source previews
+- successful pipeline executions
+- expected source structures
+- successful raw JSON persistence in OneLake
 
-## Silver validation
+## Context Silver validation
 
-The first Silver notebook contains executable assertions for the current source:
+The contextual Silver notebook validates:
 
-- output must not be empty
-- `source_id` must remain unique
-- critical columns must not contain nulls
-- `value` must not contain negative values
-- Bronze and Silver row counts are reconciled
+- non-empty output
+- unique `source_id`
+- non-null critical fields
+- non-negative analytical values
+- Bronze-to-Silver row reconciliation
 
-Current run:
+## Bicing Silver validation
+
+The Bicing notebook validates:
+
+- non-empty output
+- unique `station_id + source_timestamp`
+- non-null identifiers, timestamps and coordinates
+- non-null availability values
+- non-negative availability values
+- valid coordinate ranges
+
+The bike-type breakdown consistency is intentionally a warning rather than a critical assertion. The result is preserved in `bike_breakdown_valid`.
+
+Current validated output:
 
 ```text
-Bronze records: 100
-Silver records: 100
-All Silver data quality checks passed.
+Bicing Silver rows: 544
+Critical checks: passed
+Bike breakdown warnings: 1
 ```
 
-These checks run before the curated Delta table is considered valid.
+## Planned validation
 
-## Planned tests
+Historical and Gold processing will add:
 
-As the platform grows I will add:
-
+- snapshot freshness checks
+- duplicate ingestion protection
 - schema contracts
-- accepted ranges and domains
-- malformed-record quarantine
-- freshness checks
 - referential-integrity checks
 - Gold KPI reconciliation

@@ -18,14 +18,7 @@ I use Delta tables for Silver and will use them for Gold so curated datasets can
 
 **Status:** Accepted
 
-I store REST payloads under Lakehouse `Files/bronze` instead of converting them immediately into curated tables. This preserves the original source response before transformation logic is applied.
-
-Current objects:
-
-```text
-Files/bronze/opendata/district_data/district_data.json
-Files/bronze/citybikes/bicing/bicing_snapshot.json
-```
+I store REST payloads under Lakehouse `Files/bronze` before applying curated transformations.
 
 ## ADR-004 — Fabric Data Factory for ingestion orchestration
 
@@ -37,32 +30,54 @@ I use Fabric pipelines and Copy activities for source ingestion so extraction ca
 
 **Status:** Accepted for the first milestone
 
-I tested Bicing's public GBFS API first, but the upstream API returned a temporary HTTP 503 block when called through Fabric. I switched the first operational ingestion to Barcelona Open Data's CKAN API so the Bronze architecture could be validated independently of that upstream limitation.
+The direct Bicing GBFS endpoint returned a temporary HTTP 503 block through Fabric. I used Barcelona Open Data CKAN to validate the first ingestion path independently of that upstream limitation.
 
 ## ADR-006 — Preserve source codes as strings in Silver
 
 **Status:** Accepted
 
-Fields such as district, neighborhood, census section and nationality codes may contain numeric-looking values, but semantically they are identifiers. I keep them as strings in Silver to preserve their meaning and avoid accidental arithmetic.
+Numeric-looking geographic codes remain strings because they are identifiers rather than measures.
 
 ## ADR-007 — Name the first curated table by its actual grain
 
 **Status:** Accepted
 
-I use `silver_district_context` instead of `silver_districts` because the source contains multiple observations per district across census sections, neighborhoods and nationality categories.
+I use `silver_district_context` because the source contains multiple observations per district rather than one row per district.
 
 ## ADR-008 — Use CityBikes as the operational Bicing REST source
 
 **Status:** Accepted
 
-I use the CityBikes network endpoint for the current Bicing ingestion because it exposes station-level availability through a stable REST response that Fabric can ingest directly.
-
-The endpoint provides the nested `network.stations` array required for station-level mobility analysis.
+I use the CityBikes Bicing network endpoint because it exposes station-level availability through a REST response that Fabric can ingest directly.
 
 ## ADR-009 — Separate initial snapshot ingestion from historical snapshot design
 
 **Status:** Accepted
 
-I currently persist the first Bicing payload as `bicing_snapshot.json` to validate ingestion independently from incremental design.
+The first Bicing payload is stored as `bicing_snapshot.json` to validate ingestion and transformation independently from the historical design.
 
-I will add timestamped or partitioned snapshot persistence before implementing historical station analysis. This keeps the initial milestone simple without presenting a single overwritten file as a completed historical ingestion strategy.
+Historical snapshot persistence will be implemented before time-based Gold analysis.
+
+## ADR-010 — Parse Bicing timestamps explicitly
+
+**Status:** Accepted
+
+The source timestamp representation included both an explicit UTC offset and a trailing `Z`, which caused Spark's default timestamp conversion to return null values.
+
+I normalize the trailing `Z` and use an explicit timestamp pattern so parsing behavior is deterministic.
+
+## ADR-011 — Distinguish critical failures from source-quality warnings
+
+**Status:** Accepted
+
+Not every source inconsistency should invalidate an entire ingestion batch.
+
+Critical issues such as missing identifiers, missing timestamps, invalid coordinates, negative availability values or duplicate station snapshots stop the Silver transformation.
+
+The bike-type breakdown mismatch is retained as a non-critical warning because the source does not guarantee that:
+
+```text
+free_bikes = ebikes + normal_bikes
+```
+
+I preserve the source values and expose the result through `bike_breakdown_valid` instead of altering or discarding the record.
