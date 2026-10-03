@@ -1,53 +1,23 @@
 # Tests
 
-I keep validation close to each transformation so data-quality rules execute with the logic they protect.
+Validation is executed close to each transformation.
 
-## Bronze validation
-
-The Bronze layer is validated through:
-
-- source previews
-- successful pipeline executions
-- expected source structures
-- successful raw JSON persistence in OneLake
-
-## Context Silver validation
-
-The contextual Silver notebook validates:
-
+## Context Silver
 - non-empty output
-- unique `source_id`
-- non-null critical fields
+- unique source identifiers
+- critical null checks
 - non-negative analytical values
-- Bronze-to-Silver row reconciliation
 
-## Bicing Silver validation
+## Bicing historical / incremental
+- incremental batch is non-empty when processing continues
+- unique `station_id + snapshot_ingested_at`
+- critical fields are non-null
+- availability values are non-negative
+- coordinates are valid
+- bike-breakdown inconsistencies are warnings, not hard failures
+- Delta MERGE is idempotent
+- final historical duplicates remain zero
+- watermark advances after successful insertion
+- no-new-data exits successfully
 
-The Bicing notebook validates:
-
-- non-empty output
-- unique `station_id + source_timestamp`
-- non-null identifiers, timestamps and coordinates
-- non-null availability values
-- non-negative availability values
-- valid coordinate ranges
-
-The bike-type breakdown consistency is intentionally a warning rather than a critical assertion. The result is preserved in `bike_breakdown_valid`.
-
-Current validated output:
-
-```text
-Bicing Silver rows: 544
-Critical checks: passed
-Bike breakdown warnings: 1
-```
-
-## Planned validation
-
-Historical and Gold processing will add:
-
-- snapshot freshness checks
-- duplicate ingestion protection
-- schema contracts
-- referential-integrity checks
-- Gold KPI reconciliation
+The end-to-end Copy → Notebook pipeline has also been executed successfully.

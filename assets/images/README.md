@@ -1,25 +1,15 @@
 # Project images
 
-I keep implementation screenshots and architecture visuals in this directory.
-
 ## Current evidence
 
-- `01-fabric-lakehouse.png` — Fabric Lakehouse Bronze structure
-- `02-rest-source-preview.png` — Open Data Barcelona REST preview
-- `03-bronze-pipeline-run.png` — contextual Bronze pipeline execution
-- `04-bronze-file.png` — contextual raw JSON stored in OneLake
-- `05-silver-district-table.png` — `silver_district_context` Delta table
-- `06-silver-district-quality.png` — contextual Silver quality checks
-- `07-bicing-source-preview.png` — CityBikes Bicing REST preview
-- `08-bicing-pipeline-run.png` — Bicing Bronze pipeline execution
-- `09-bicing-bronze-file.png` — Bicing raw snapshot stored in OneLake
+Images `01` through `12` document Bronze, Silver and troubleshooting milestones.
 
-## Pending upload
+## Historical / incremental evidence to add
 
-- `10-bicing-timestamp-parsing.png` — timestamp parsing failure and investigation
-- `11-bicing-offline-quality-anomaly.png` — bike-breakdown inconsistency for the offline station record
-- `12-bicing-silver-table.png` — final `silver_bicing_station_status` Delta table and schema
+- `13-bicing-bronze-history.png` — multiple timestamped Bronze snapshots
+- `14-bicing-incremental-merge.png` — MERGE result and watermark advancement
+- `15-bicing-end-to-end-pipeline.png` — successful Copy → Notebook orchestration
 
 ## Planned
 
-- `architecture-overview.png` — polished end-to-end architecture diagram
+- `architecture-overview.png`

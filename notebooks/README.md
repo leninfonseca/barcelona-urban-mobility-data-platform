@@ -1,59 +1,22 @@
 # Fabric / PySpark Notebooks
 
-Fabric Data Factory handles Bronze ingestion. I use notebooks for transformation, data quality and curated-layer logic.
-
 ## Implemented
 
 ### nb_bronze_to_silver_districts
-
-This notebook performs the full Bronze-to-Silver transformation for the contextual district dataset.
-
-It:
-
-- reads the CKAN Bronze JSON
-- extracts and explodes `result.records`
-- normalizes names and types
-- validates critical data-quality rules
-- writes `silver_district_context` as Delta
-
-A repository-friendly PySpark version is stored in `nb_bronze_to_silver_districts.py`.
+Transforms the contextual CKAN payload into `silver_district_context`.
 
 ### nb_bronze_to_silver_bicing
+Implements the initial single-snapshot Bicing Silver milestone.
 
-This notebook performs the Bronze-to-Silver transformation for CityBikes Bicing station data.
+### nb_bicing_snapshot_history
+Production-oriented historical/incremental notebook.
 
-It:
+It supports bootstrap and incremental execution, derives a watermark from `silver_bicing_station_history`, reads only newer Bronze snapshots, exits successfully when no new data exists, applies Silver transformations and quality checks, performs an idempotent Delta MERGE, and validates watermark advancement.
 
-- reads `Files/bronze/citybikes/bicing/bicing_snapshot.json`
-- extracts and explodes `network.stations`
-- flattens station and `extra` fields
-- normalizes identifiers and measures
-- explicitly parses the source timestamp
-- derives `station_capacity`
-- removes duplicate station snapshots by `station_id + source_timestamp`
-- separates critical assertions from non-critical warnings
-- adds `bike_breakdown_valid`
-- writes `silver_bicing_station_status` as Delta
-- validates the persisted table
+Historical key: `station_id + snapshot_ingested_at`.
 
-The current validated output contains 544 rows.
+Repository-friendly code: `nb_bicing_snapshot_history.py`.
 
-A repository-friendly PySpark version is stored in `nb_bronze_to_silver_bicing.py`.
+## Next
 
-## Planned notebooks
-
-1. `nb_bicing_snapshot_history`
-   - preserve multiple station snapshots
-   - add deterministic ingestion timestamps/partitions
-   - prevent duplicate reprocessing
-
-2. `nb_silver_enrichment`
-   - join mobility and contextual/geographic datasets
-   - apply window functions and derived attributes
-
-3. `nb_gold_model`
-   - build business-ready dimensions, facts and KPIs
-
-4. `nb_incremental_load`
-   - implement incremental patterns
-   - add Delta MERGE/upsert logic where appropriate
+`nb_gold_model` will build the analytical Gold layer.

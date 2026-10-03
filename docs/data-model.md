@@ -1,52 +1,41 @@
 # Data Model
 
-I evolve the model layer by layer after inspecting the real source structures.
-
 ## Bronze
 
-Current raw objects:
+Context:
 
 ```text
 Files/bronze/opendata/district_data/district_data.json
-Files/bronze/citybikes/bicing/bicing_snapshot.json
+```
+
+Bicing history:
+
+```text
+Files/bronze/citybikes/bicing/history/year=YYYY/month=MM/day=DD/bicing_YYYYMMDD_HHMMSS.json
 ```
 
 ## Silver
 
 ### silver_district_context
-
-This contextual table is operational and contains typed geographic and demographic observations.
+Typed contextual observations.
 
 ### silver_bicing_station_status
+Initial single-snapshot Bicing milestone.
 
-This station-level Delta table is now operational.
+### silver_bicing_station_history
+Historical Bicing Delta table.
 
-**Grain:** one Bicing station observation per source timestamp.
+**Grain:** one station observation per ingestion snapshot.
 
-Current columns:
+**Key:** `station_id + snapshot_ingested_at`.
 
-| Column | Type | Purpose |
-|---|---|---|
-| station_id | string | CityBikes station identifier |
-| station_uid | long | Bicing station UID exposed by the source |
-| station_name | string | Station name/location label |
-| latitude | double | Station latitude |
-| longitude | double | Station longitude |
-| source_timestamp | timestamp | Timestamp reported by the source |
-| free_bikes | long | Available bikes |
-| empty_slots | long | Available docking slots |
-| ebikes | long | Available electric bikes |
-| normal_bikes | long | Available standard bikes |
-| has_ebikes | boolean | Source capability flag |
-| is_online | boolean | Source station status |
-| station_capacity | long | Derived as free bikes + empty slots |
-| bike_breakdown_valid | boolean | Quality flag for bike-type consistency |
-| silver_processed_at | timestamp | Silver processing timestamp |
+Important timestamps:
+- `source_timestamp`
+- `snapshot_ingested_at`
+- `silver_processed_at`
 
-The current validated table contains 544 station observations.
-
-The pair `station_id + source_timestamp` defines the snapshot-level uniqueness rule used during deduplication and quality validation.
+The model does not assume a fixed station count. Observed snapshots have contained both 544 and 543 stations, and prior history is preserved when a station is absent from a later snapshot.
 
 ## Gold
 
-The Gold model will be defined after historical Bicing snapshots are preserved and incremental processing is implemented. This avoids designing time-based facts before the historical grain is established.
+Gold is the next milestone and will be designed from the validated historical grain.

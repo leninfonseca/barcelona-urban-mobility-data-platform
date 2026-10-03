@@ -1,159 +1,58 @@
 # Barcelona Urban Mobility Data Platform
 
-I am building an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public data, covering ingestion, orchestration, Lakehouse design, PySpark transformations, Delta Lake, data quality, SQL modeling and analytical serving.
+I am building an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public data.
 
-## Current implementation
+## Current state
 
-Two independent REST ingestion paths are operational and both now reach Silver.
+Two REST ingestion paths are operational and both reach Silver.
 
 ### Contextual district data
-
-- Source: Barcelona Open Data CKAN REST API
 - Pipeline: `pl_ingest_mobility_bronze`
-- Copy activity: `cp_ingest_mobility_bronze`
-- Bronze file: `Files/bronze/opendata/district_data/district_data.json`
-- PySpark notebook: `nb_bronze_to_silver_districts`
-- Silver Delta table: `silver_district_context`
-- Silver quality assertions: operational
+- Bronze: `Files/bronze/opendata/district_data/district_data.json`
+- Notebook: `nb_bronze_to_silver_districts`
+- Silver: `silver_district_context`
 
-### Bicing station availability
-
-- Source: CityBikes REST API
-- Network: `bicing`
+### Bicing mobility data
+- Source: CityBikes Bicing REST API
 - Pipeline: `pl_ingest_bicing_bronze`
-- Copy activity: `cp_ingest_bicing_bronze`
-- Bronze file: `Files/bronze/citybikes/bicing/bicing_snapshot.json`
-- PySpark notebook: `nb_bronze_to_silver_bicing`
-- Silver Delta table: `silver_bicing_station_status`
-- Current validated row count: 544
-- Critical Silver quality assertions: passed
-- Non-critical source inconsistency tracking: implemented
+- Bronze history: timestamped JSON snapshots partitioned by year/month/day
+- Notebook: `nb_bicing_snapshot_history`
+- Historical Silver: `silver_bicing_station_history`
+- Incremental strategy: watermark + Delta MERGE
+- Orchestration: Copy activity → Notebook activity
 
-The district dataset provides contextual geographic attributes. The Bicing source provides station-level availability, coordinates, bike-type breakdowns and source timestamps.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    A1[Barcelona Open Data CKAN] --> B1[Fabric Data Factory Pipeline]
-    A2[CityBikes Bicing API] --> B2[Fabric Data Factory Pipeline]
-    B1 --> C[Bronze - OneLake Files]
-    B2 --> C
-    C --> D[PySpark Notebooks]
-    D --> E[Silver - Delta Tables]
-    E --> F[PySpark + SQL]
-    F --> G[Gold - Analytical Model]
-    G --> H[SQL Analytics Endpoint / BI]
-```
-
-## Implemented flows
+## Bicing historical flow
 
 ```text
-Barcelona Open Data CKAN API
-        ↓
-pl_ingest_mobility_bronze
-        ↓
-Files/bronze/opendata/district_data/district_data.json
-        ↓
-nb_bronze_to_silver_districts
-        ↓
-silver_district_context
+CityBikes API
+→ timestamped Bronze snapshot
+→ watermark detection
+→ read only new snapshots
+→ PySpark transformation
+→ data quality checks
+→ Delta MERGE
+→ silver_bicing_station_history
 ```
 
-```text
-CityBikes Bicing API
-        ↓
-pl_ingest_bicing_bronze
-        ↓
-Files/bronze/citybikes/bicing/bicing_snapshot.json
-        ↓
-nb_bronze_to_silver_bicing
-        ↓
-silver_bicing_station_status
-```
+Historical grain: `station_id + snapshot_ingested_at`.
 
-## Silver milestone
+The notebook supports bootstrap and incremental execution, exits successfully when there is no new data, and reprocessing the same batch does not create duplicates.
 
-The Bicing transformation now:
+## Data quality
 
-- extracts and explodes `network.stations`
-- normalizes station-level fields
-- parses source timestamps explicitly
-- casts identifiers and measures
-- derives station capacity
-- removes duplicate station snapshots
-- validates critical nulls, coordinates and availability values
-- classifies bike-breakdown inconsistencies as non-critical warnings
-- adds `bike_breakdown_valid` for traceability
-- persists the curated result as a Delta table
+Critical rules stop processing. Non-critical source inconsistencies are preserved through warnings and `bike_breakdown_valid`.
 
-The validated Bicing Silver table contains 544 station observations.
-
-## Data quality and troubleshooting
-
-Implementation issues that affected parsing or data-quality behavior are documented separately so technical decisions remain traceable.
-
-See [Troubleshooting](docs/troubleshooting.md).
-
-The two documented cases are:
-
-- CityBikes timestamp parsing failure caused by a non-standard timezone suffix combination.
-- A bike-type availability inconsistency in one offline station record, handled as a warning rather than a destructive correction.
-
-## Technical scope
-
-The project currently covers:
-
-- REST/API ingestion with Fabric Data Factory
-- multiple independent ingestion sources
-- pipeline orchestration and monitoring
-- OneLake and Fabric Lakehouse storage
-- Medallion architecture
-- raw JSON preservation in Bronze
-- nested JSON normalization with PySpark
-- explicit timestamp parsing
-- Delta Lake tables for curated layers
-- critical assertions and non-critical quality flags
-- source anomaly investigation
-- SQL modeling and analytical queries
-- incremental loading and historical snapshots
-- engineering decisions and operational documentation
-
-## Repository structure
-
-```text
-.
-├── architecture/
-├── notebooks/
-├── pipelines/
-├── sql/
-├── docs/
-│   └── troubleshooting.md
-├── tests/
-└── assets/
-    └── images/
-```
+See [Data Quality](docs/data-quality.md) and [Troubleshooting](docs/troubleshooting.md).
 
 ## Evidence
 
-Implementation evidence is stored under `assets/images/`.
-
-Current evidence covers:
-
-- contextual Bronze ingestion
-- contextual Silver table and quality checks
-- Bicing REST source preview
-- Bicing Bronze pipeline execution
-- Bicing Bronze file persistence
-
-The next three screenshots are reserved for the completed Bicing Silver milestone and troubleshooting cases:
-
-- `10-bicing-timestamp-parsing.png`
-- `11-bicing-offline-quality-anomaly.png`
-- `12-bicing-silver-table.png`
+Historical/incremental screenshots:
+- `13-bicing-bronze-history.png`
+- `14-bicing-incremental-merge.png`
+- `15-bicing-end-to-end-pipeline.png`
 
 ## Status
 
-**In development — both current sources reach Silver successfully.**
+**Bronze and Silver are operational, including historical incremental Bicing processing and end-to-end orchestration.**
 
-Next milestone: preserve historical Bicing snapshots, add incremental processing and prepare the first Gold analytical model.
+Next milestone: Gold modeling, SQL analytics and analytical serving.
