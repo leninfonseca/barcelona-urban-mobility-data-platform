@@ -1,8 +1,14 @@
 # Barcelona Urban Mobility Data Platform
 
-I am building an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public data.
+I built an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public mobility data.
 
-The project currently implements REST ingestion, historical Bronze snapshots, incremental Silver processing, a Gold star schema and SQL analytical serving for Bicing availability data.
+The project covers REST ingestion, immutable Bronze history, incremental Silver processing, Delta MERGE, Gold dimensional modeling, SQL analytics and a Power BI semantic/reporting layer.
+
+## Demo
+
+![Barcelona Bicing Power BI demo](assets/demos/project-barcelona.gif)
+
+The GIF is a permanent portfolio demo of the interactive report. The repository also includes the Power BI report artifact and static evidence screenshots.
 
 ## Architecture
 
@@ -18,38 +24,61 @@ CityBikes Bicing API ┘
                     PySpark / Delta
                             │
                             ▼
-                         Silver
+                 Silver historical layer
                             │
                             ▼
                     Gold Star Schema
                             │
-                            ▼
-                 SQL Analytics Endpoint
-                            │
-                            ▼
-                        Power BI
+              ┌─────────────┴─────────────┐
+              ▼                           ▼
+      SQL Analytics Endpoint      Power BI Semantic Model
+                                          │
+                                          ▼
+                                     Dashboard
 ```
 
 See [Architecture](architecture/README.md) for the detailed flow.
 
-## Implemented data paths
+## End-to-end Bicing pipeline
 
-### Contextual district data
+The production flow is orchestrated in Fabric:
 
-- Pipeline: `pl_ingest_mobility_bronze`
-- Bronze: `Files/bronze/opendata/district_data/district_data.json`
-- Notebook: `nb_bronze_to_silver_districts`
-- Silver: `silver_district_context`
+```text
+CityBikes REST API
+        │
+        ▼
+cp_ingest_bicing_bronze
+        │ Success
+        ▼
+Historical Silver notebook
+        │ Success
+        ▼
+nb_gold_bicing_analytics
+        │
+        ▼
+Gold Delta star schema
+        │
+        ├── SQL Analytics Endpoint
+        └── Power BI
+```
 
-### Bicing mobility data
+The final orchestration has been executed successfully from Bronze ingestion through Gold generation.
 
-- Source: CityBikes Bicing REST API
-- Pipeline: `pl_ingest_bicing_bronze`
-- Bronze history: immutable timestamped JSON snapshots partitioned by year/month/day
-- Historical notebook: `nb_bicing_snapshot_history`
-- Historical Silver: `silver_bicing_station_history`
-- Incremental strategy: watermark + Delta MERGE
-- Orchestration: Copy activity → Notebook activity
+## Bronze and incremental Silver
+
+Bicing history is stored as immutable timestamped JSON snapshots:
+
+```text
+Files/bronze/citybikes/bicing/history/
+└── year=YYYY/month=MM/day=DD/
+    └── bicing_YYYYMMDD_HHMMSS.json
+```
+
+Historical Silver table:
+
+```text
+silver_bicing_station_history
+```
 
 Historical grain:
 
@@ -57,15 +86,16 @@ Historical grain:
 station_id + snapshot_ingested_at
 ```
 
-The historical notebook supports bootstrap and incremental execution, reads only snapshots newer than the current watermark, exits successfully when there is no new data and does not duplicate rows when the same batch is reprocessed.
+The incremental notebook:
+
+- derives a watermark from the historical Silver table
+- reads only newer Bronze snapshots
+- validates each incremental batch
+- exits successfully when there is no new data
+- performs an idempotent Delta MERGE
+- preserves source warnings instead of silently correcting them
 
 ## Gold analytical layer
-
-Notebook:
-
-```text
-nb_gold_bicing_analytics
-```
 
 Gold is modeled as a star schema:
 
@@ -84,7 +114,7 @@ Persisted Delta tables:
 - `gold_dim_time`
 - `gold_fact_bicing_availability`
 
-The fact table keeps one station observation per ingestion snapshot and exposes analytical measures including:
+The fact table keeps one station observation per ingestion snapshot and exposes:
 
 - available bikes and empty docks
 - e-bike and normal-bike counts
@@ -93,24 +123,24 @@ The fact table keeps one station observation per ingestion snapshot and exposes 
 - `dock_availability_pct`
 - `ebike_share_pct`
 
-The Gold notebook rebuilds the analytical layer from the validated Silver history using Delta overwrite. Silver remains the historical source of truth.
+Gold is currently rebuilt from the validated Silver history using Delta overwrite. Silver remains the historical source of truth.
 
 See [Data Model](docs/data-model.md), [Data Quality](docs/data-quality.md) and [Engineering Decisions](docs/decisions.md).
 
 ## SQL Analytics Endpoint
 
-The Gold Delta tables are exposed through the Fabric SQL Analytics Endpoint and queried with T-SQL.
+The Gold Delta tables are exposed through Fabric's SQL Analytics Endpoint.
 
-Repository queries:
+Versioned T-SQL queries under `sql/` cover:
 
-- `01_gold_star_schema_preview.sql` — joins fact + station/date/time dimensions
-- `02_low_availability_stations.sql` — ranks online stations by average bike availability
-- `03_availability_by_day_period.sql` — aggregates KPIs by day period
-- `04_weekday_vs_weekend.sql` — compares weekday/weekend availability
-- `05_availability_by_day.sql` — aggregates availability by day of week
-- `06_powerbi_serving_query.sql` — denormalized serving query for downstream BI
+- star-schema preview
+- low-availability station ranking
+- availability by day period
+- weekday vs weekend comparison
+- day-of-week analysis
+- a denormalized Power BI serving query
 
-The serving query combines station, date and time context with Gold measures and derives an `availability_status` using `CASE`:
+The SQL serving query also derives:
 
 ```text
 Offline
@@ -121,6 +151,39 @@ Balanced
 ```
 
 See [SQL queries](sql/README.md).
+
+## Power BI
+
+The semantic model uses the Gold star schema directly.
+
+Relationships:
+
+```text
+gold_dim_station[station_key]  1 ─── * gold_fact_bicing_availability[station_key]
+gold_dim_date[date_key]        1 ─── * gold_fact_bicing_availability[date_key]
+gold_dim_time[time_key]        1 ─── * gold_fact_bicing_availability[time_key]
+```
+
+Filters flow from dimensions to the fact.
+
+The report includes:
+
+- weighted bike availability KPI
+- weighted dock availability KPI
+- e-bike share
+- online observation rate
+- date, day-period and station slicers
+- station availability map
+- availability-over-time line chart
+- low-availability station ranking
+
+The repository includes a live-connected Power BI report artifact:
+
+[Power BI report](assets/powerbi/Bicing%20Network%20Overview.pbix)
+
+Because it is live-connected to the Fabric semantic model, the PBIX itself does not embed the underlying Direct Lake data. The GIF and screenshots remain self-contained portfolio evidence.
+
+See [Power BI notes](assets/powerbi/README.md).
 
 ## Data quality
 
@@ -156,18 +219,19 @@ Source inconsistencies that are not critical are preserved rather than silently 
 - `19-sql-analytics-endpoint.png`
 - `20-sql-serving-query.png`
 
-![Gold Delta tables](assets/images/16-gold-star-schema-tables.png)
+### Power BI and final orchestration
 
-![SQL Analytics Endpoint](assets/images/19-sql-analytics-endpoint.png)
+- `21-powerbi-semantic-model.png`
+- `22-end-to-end-bronze-silver-gold.png`
+- `23-powerbi-network-overview.png`
+- `assets/demos/project-barcelona.gif`
 
-![SQL serving query](assets/images/20-sql-serving-query.png)
+![Power BI semantic model](assets/images/21-powerbi-semantic-model.png)
+
+![Final Power BI dashboard](assets/images/23-powerbi-network-overview.png)
 
 ## Current status
 
-**Bronze, historical/incremental Silver, Gold star-schema modeling and SQL analytical serving are operational.**
+**Core technical implementation is complete: Bronze → incremental Silver → Gold → SQL → Power BI.**
 
-Next milestones:
-
-1. Build the Power BI analytical/reporting layer.
-2. Optionally attach Gold processing to the end-to-end Fabric orchestration.
-3. Complete the final architecture diagrams and portfolio documentation.
+The remaining work is portfolio presentation: final architecture diagrams and documentation polish.

@@ -6,13 +6,20 @@ I use a Medallion architecture in Microsoft Fabric.
 flowchart TD
     A1[Barcelona Open Data] --> B1[Fabric Data Factory]
     A2[CityBikes Bicing API] --> B2[Fabric Data Factory]
+
     B1 --> C[Bronze - OneLake]
     B2 --> C
-    C --> D[PySpark Notebooks]
-    D --> E[Silver - Delta]
-    E --> F[Gold - Star Schema]
-    F --> G[SQL Analytics Endpoint]
-    G --> H[Power BI]
+
+    C --> D[PySpark Silver Processing]
+    D --> E[Silver - Delta History]
+
+    E --> F[PySpark Gold Modeling]
+    F --> G[Gold - Star Schema]
+
+    G --> H[SQL Analytics Endpoint]
+    G --> I[Power BI Semantic Model]
+
+    I --> J[Power BI Dashboard]
 ```
 
 ## Bronze
@@ -45,20 +52,25 @@ Historical grain:
 station_id + snapshot_ingested_at
 ```
 
-The historical table is updated with a watermark-based incremental process and an idempotent Delta MERGE.
+The historical Bicing table is maintained with watermark-based incremental processing and an idempotent Delta MERGE.
 
-## Current orchestration
+## End-to-end orchestration
+
+The Bicing pipeline now runs the full engineering path in sequence:
 
 ```text
 cp_ingest_bicing_bronze
         │ Success
         ▼
-nb_process_bicing_history
+Historical Silver notebook
+        │ Success
+        ▼
+nb_gold_bicing_analytics
 ```
 
-The notebook reads only snapshots newer than the current Silver watermark.
+This guarantees that Gold is rebuilt only after the Bronze ingestion and Silver historical processing complete successfully.
 
-The Gold notebook is currently a downstream analytical build executed separately. It is not yet attached to the ingestion pipeline, so the repository does not claim Gold orchestration that has not been implemented.
+The final Bronze → Silver → Gold run has been validated successfully.
 
 ## Gold
 
@@ -71,9 +83,9 @@ flowchart TB
     T[gold_dim_time]
     F[gold_fact_bicing_availability]
 
-    S -->|station_key| F
-    D -->|date_key| F
-    T -->|time_key| F
+    S -->|station_key 1:*| F
+    D -->|date_key 1:*| F
+    T -->|time_key 1:*| F
 ```
 
 ### Fact grain
@@ -88,26 +100,19 @@ Logical historical key:
 station_key + snapshot_ingested_at
 ```
 
-### Dimension responsibilities
-
-- `gold_dim_station` describes the latest known station attributes.
-- `gold_dim_date` provides reusable calendar attributes.
-- `gold_dim_time` provides observed time-of-day attributes and day periods.
-- `gold_fact_bicing_availability` stores measurable station availability observations and derived KPIs.
-
 Gold uses a deterministic `xxhash64(station_id)` surrogate key for station relationships.
 
 ## Rebuild strategy
 
 Silver is the historical source of truth and is incrementally maintained.
 
-Gold is currently rebuilt from the complete validated Silver history:
+Gold is rebuilt from the complete validated Silver history:
 
 ```text
 Silver history
       │
       ▼
-build dimensions + fact
+dimensions + fact
       │
       ▼
 quality checks
@@ -116,31 +121,32 @@ quality checks
 Delta overwrite
 ```
 
-This keeps the analytical model consistent while the dataset is still small and the model is evolving.
+For the current volume, a full Gold rebuild keeps KPI logic and dimensions deterministic and simple.
 
 ## SQL serving layer
 
-Fabric exposes the Gold Delta tables through the Lakehouse SQL Analytics Endpoint.
+Fabric exposes the Gold Delta tables through the SQL Analytics Endpoint.
 
-The SQL layer currently provides:
+The SQL layer provides joins, aggregations and a BI-oriented serving projection while keeping the physical Gold model dimensional.
+
+## Power BI semantic layer
+
+Power BI consumes the Gold star schema directly.
+
+Relationships are one-to-many with single-direction filtering from dimensions to fact:
 
 ```text
-Gold Delta tables
-      │
-      ▼
-T-SQL joins and aggregations
-      │
-      ├── station availability ranking
-      ├── day-period analysis
-      ├── weekday/weekend analysis
-      ├── day-of-week analysis
-      └── Power BI serving dataset
+dim_station 1 ─── * fact
+dim_date    1 ─── * fact
+dim_time    1 ─── * fact
 ```
 
-The serving query denormalizes the star schema for convenient BI consumption while keeping the physical Gold model dimensional.
+DAX measures aggregate the fact dynamically under report filter context.
+
+The final report uses station, date and time dimensions to filter KPI cards, an Azure Maps station view, the historical availability line chart and the station ranking.
 
 ## Context dataset boundary
 
-`silver_district_context` is not currently joined into the Bicing star schema because the two datasets do not expose a reliable direct join key or equivalent spatial geometry in the current model.
+`silver_district_context` is not joined into the Bicing star schema because the current datasets do not expose a reliable direct key or equivalent spatial geometry.
 
 No name-based or artificial join is used. A future spatial enrichment can assign stations to districts or neighborhoods when appropriate geographic boundaries are available.

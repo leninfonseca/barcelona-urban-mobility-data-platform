@@ -2,16 +2,19 @@
 
 ## pl_ingest_bicing_bronze
 
-The Bicing pipeline orchestrates Bronze ingestion and incremental Silver processing.
+The Bicing pipeline now orchestrates the complete Bronze → Silver → Gold engineering flow.
 
 ```text
 cp_ingest_bicing_bronze
         │ Success
         ▼
-nb_process_bicing_history
+Historical Silver notebook
+        │ Success
+        ▼
+nb_gold_bicing_analytics
 ```
 
-### Historical Bronze destination
+## Historical Bronze destination
 
 Folder expression:
 
@@ -30,11 +33,11 @@ File expression:
 @concat('bicing_', formatDateTime(utcNow(),'yyyyMMdd_HHmmss'), '.json')
 ```
 
-Each successful ingestion therefore creates an immutable timestamped snapshot instead of overwriting the previous source file.
+Each successful ingestion creates an immutable timestamped snapshot instead of overwriting a previous source file.
 
 ## Incremental Silver processing
 
-The notebook activity:
+The historical Silver notebook:
 
 1. Reads the current watermark from `silver_bicing_station_history`.
 2. Recursively lists Bronze history files.
@@ -44,12 +47,30 @@ The notebook activity:
 6. Performs an idempotent Delta MERGE.
 7. Validates the resulting historical table and watermark advancement.
 
-The end-to-end Copy → Notebook execution has been validated successfully.
+## Gold processing
 
-## Gold downstream processing
+After Silver succeeds, `nb_gold_bicing_analytics`:
 
-`nb_gold_bicing_analytics` now builds the Gold star schema from `silver_bicing_station_history`.
+1. Revalidates the Silver historical grain.
+2. Builds `gold_dim_station`, `gold_dim_date` and `gold_dim_time`.
+3. Builds `gold_fact_bicing_availability`.
+4. Calculates analytical KPIs.
+5. Validates row reconciliation and referential integrity.
+6. Overwrites the Gold Delta tables with a consistent rebuild.
+7. Re-reads the persisted model and validates analytical joins.
 
-At the current project stage, Gold is executed separately and is **not yet part of `pl_ingest_bicing_bronze`**. This keeps the documented orchestration aligned with what has actually been implemented.
+## Final validation
 
-A future orchestration step can attach Gold processing after successful Silver completion once the SQL/BI serving flow is finalized.
+The complete pipeline has been executed successfully with all three stages completing correctly:
+
+```text
+Bronze Copy  ✅
+Silver       ✅
+Gold         ✅
+```
+
+Evidence:
+
+```text
+assets/images/22-end-to-end-bronze-silver-gold.png
+```

@@ -22,8 +22,6 @@ Validation is executed close to each transformation instead of being deferred to
 - watermark advances after successful insertion
 - no-new-data exits successfully
 
-The end-to-end Copy → Notebook pipeline has also been executed successfully.
-
 ## Gold star schema
 
 Before persistence, `nb_gold_bicing_analytics` validates:
@@ -37,4 +35,33 @@ Before persistence, `nb_gold_bicing_analytics` validates:
 - zero orphan time foreign keys
 - percentage KPIs remain between 0 and 100 when non-null
 
-After persistence, the notebook reads the Delta tables again and performs analytical joins and sample aggregations to validate that the star schema is consumable for downstream SQL and BI workloads.
+After persistence, the notebook re-reads the Delta tables and validates dimensional joins and analytical aggregations.
+
+## Power BI semantic model validation
+
+The semantic model was checked with:
+
+- `dim_station 1:* fact`
+- `dim_date 1:* fact`
+- `dim_time 1:* fact`
+- single-direction filters from dimensions to fact
+- DAX KPI cards responding to slicer filter context
+- station slicer filtering cards, map, temporal chart and ranking
+- date/day-period slicers propagating through the fact
+- latitude/longitude station map rendering expected Barcelona locations
+
+## End-to-end orchestration validation
+
+The complete Fabric chain has been executed successfully:
+
+```text
+Bronze Copy  ✅
+Silver       ✅
+Gold         ✅
+```
+
+Evidence is stored in:
+
+```text
+assets/images/22-end-to-end-bronze-silver-gold.png
+```

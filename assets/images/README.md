@@ -8,20 +8,27 @@ Images `01` through `12` document the initial Fabric Lakehouse, REST ingestion, 
 
 - `13-bicing-bronze-history.png` — timestamped immutable Bronze snapshots partitioned by date
 - `14-bicing-incremental-merge.png` — incremental Delta MERGE result
-- `15-bicing-end-to-end-pipeline.png` — successful Copy → historical notebook orchestration
+- `15-bicing-end-to-end-pipeline.png` — successful Copy → historical Silver notebook orchestration
 
 ## Gold analytical evidence
 
-- `16-gold-star-schema-tables.png` — persisted Gold dimension and fact tables in the Lakehouse
-- `17-gold-quality-checks.png` — Gold row reconciliation, referential-integrity and KPI validation
-- `18-gold-analytical-validation.png` — analytical validation against the persisted Gold star schema
+- `16-gold-star-schema-tables.png` — persisted Gold dimension and fact tables
+- `17-gold-quality-checks.png` — row reconciliation, referential integrity and KPI validation
+- `18-gold-analytical-validation.png` — analytical validation of the persisted star schema
 
 ## SQL analytical evidence
 
-- `19-sql-analytics-endpoint.png` — Gold Delta tables exposed and queryable through the SQL Analytics Endpoint
-- `20-sql-serving-query.png` — joined T-SQL serving query with Gold dimensions, measures and analytical status
+- `19-sql-analytics-endpoint.png` — Gold Delta tables exposed through the SQL Analytics Endpoint
+- `20-sql-serving-query.png` — joined T-SQL serving query
 
-## Planned final evidence
+## Power BI and final orchestration
 
-- architecture overview
-- Power BI analytical dashboard
+- `21-powerbi-semantic-model.png` — Gold star-schema relationships in the Power BI semantic model
+- `22-end-to-end-bronze-silver-gold.png` — successful final Bronze → Silver → Gold pipeline run
+- `23-powerbi-network-overview.png` — final Bicing Network Overview dashboard
+
+Interactive demo:
+
+```text
+assets/demos/project-barcelona.gif
+```
