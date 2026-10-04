@@ -58,8 +58,6 @@ The Bicing analytical model separates measurable historical observations from de
 
 `gold_fact_bicing_availability` is the central fact table, linked to station, date and time dimensions.
 
-This makes the serving model easier to query from SQL and BI tools and avoids repeating descriptive station/calendar attributes across every analytical row.
-
 ## ADR-011 — Deterministic station surrogate key
 **Status:** Accepted
 
@@ -73,14 +71,12 @@ to generate `station_key`.
 
 The source `station_id` is retained as the natural/business identifier, while `station_key` belongs to the analytical model.
 
-A deterministic hash was selected instead of a generated row number so that rebuilding Gold produces the same key for the same station.
-
 ## ADR-012 — Latest-known station dimension
 **Status:** Accepted
 
 `gold_dim_station` keeps one row per station using the latest `snapshot_ingested_at` available in Silver.
 
-The current project does not implement SCD Type 2 for station attributes. Historical availability remains in the fact, while the station dimension represents the latest known descriptive state.
+The current project does not implement SCD Type 2 for station attributes.
 
 ## ADR-013 — Full Gold rebuild from Silver
 **Status:** Accepted
@@ -89,9 +85,7 @@ Silver remains incrementally maintained and is the historical source of truth.
 
 Gold is rebuilt with Delta overwrite from the complete validated Silver history.
 
-For the current data volume this is simpler and safer than maintaining a second incremental state layer, especially while KPI definitions and dimensions are still evolving.
-
-An incremental Gold strategy can be introduced later if scale makes full rebuilds materially expensive.
+For the current data volume this is simpler and safer than maintaining a second incremental state layer.
 
 ## ADR-014 — Do not force district enrichment
 **Status:** Accepted
@@ -101,3 +95,34 @@ The contextual district dataset and Bicing history currently have no reliable di
 The project does not join station names to neighborhood or district names heuristically.
 
 A future implementation may add geographic polygons and perform a real spatial mapping from Bicing coordinates to districts/neighborhoods.
+
+## ADR-015 — Use the SQL Analytics Endpoint as the analytical serving surface
+**Status:** Accepted
+
+The Gold Delta tables are consumed directly through the Fabric SQL Analytics Endpoint.
+
+This avoids creating a duplicate analytical database solely for SQL access and keeps the SQL layer aligned with the same Gold tables produced by Spark.
+
+## ADR-016 — Keep the physical Gold model dimensional and expose a denormalized BI query
+**Status:** Accepted
+
+The underlying Gold layer remains a star schema.
+
+For downstream BI, `06_powerbi_serving_query.sql` joins the fact with station, date and time dimensions and exposes a convenient denormalized result.
+
+This keeps dimensional modeling concerns separate from consumer convenience.
+
+## ADR-017 — Availability status is a serving-layer classification
+**Status:** Accepted
+
+The SQL serving query classifies each observation with ordered `CASE` logic:
+
+```text
+Offline
+No capacity
+Low bikes
+Low docks
+Balanced
+```
+
+The 20% low-availability thresholds are analytical rules for the current dashboard layer, not corrections to the source data and not Silver quality rules.

@@ -53,7 +53,7 @@ Important timestamps:
 - `snapshot_ingested_at` — capture time derived from the Bronze filename
 - `silver_processed_at` — time at which Spark processed the row
 
-The model does not assume a fixed station count. Observed snapshots have contained different station cardinalities, while prior historical observations remain preserved.
+The model does not assume a fixed station count. Historical observations remain preserved when a station is absent from a later snapshot.
 
 ## Gold
 
@@ -83,8 +83,6 @@ Columns:
 - `longitude`
 - `has_ebikes`
 
-The latest row is selected with a Spark window partitioned by `station_id` and ordered by `snapshot_ingested_at DESC`.
-
 ### gold_dim_date
 
 **Grain:** one row per calendar date between the minimum and maximum Silver snapshot date.
@@ -102,8 +100,6 @@ Columns:
 - `day_of_week` — Monday = 1 through Sunday = 7
 - `day_name`
 - `is_weekend`
-
-The date dimension is generated as a continuous calendar range rather than only from dates already present in the fact.
 
 ### gold_dim_time
 
@@ -174,6 +170,34 @@ Silver is incrementally maintained and remains the historical source of truth.
 Gold is currently rebuilt from Silver with Delta `overwrite` and `overwriteSchema=true`.
 
 This is intentional for the current data volume: rebuilding the analytical layer is simple, deterministic and keeps historical rows consistent when KPI logic or dimensional structures change.
+
+## SQL analytical serving model
+
+The SQL Analytics Endpoint exposes the same Gold Delta tables without creating a second physical copy of the model.
+
+The SQL queries consume the fact and dimensions through T-SQL joins and aggregations.
+
+The Power BI serving query presents a denormalized analytical projection with:
+
+- station name and coordinates
+- calendar attributes
+- time-of-day attributes
+- raw availability measures
+- Gold KPIs
+- station online state
+- `availability_status`
+
+`availability_status` is derived with ordered `CASE` logic:
+
+```text
+is_online = 0                  → Offline
+capacity is NULL or 0          → No capacity
+bike_availability_pct < 20     → Low bikes
+dock_availability_pct < 20     → Low docks
+otherwise                      → Balanced
+```
+
+The denormalized serving query does not replace the Gold star schema; it is a consumption-friendly projection over the dimensional model.
 
 ## District context relationship
 

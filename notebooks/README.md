@@ -70,6 +70,12 @@ Available repository exports:
 - `nb_gold_bicing_analytics.ipynb`
 - `nb_gold_bicing_analytics.py`
 
+## Downstream SQL layer
+
+The Gold tables are now queried through the Fabric SQL Analytics Endpoint.
+
+The SQL assets are versioned separately under `sql/`; the notebook layer remains focused on transformation, quality and persistence.
+
 ## Next
 
-The next project phase is SQL analytics over the Gold tables, followed by the Power BI serving layer.
+The next project phase is Power BI consumption of the Gold/SQL serving layer.

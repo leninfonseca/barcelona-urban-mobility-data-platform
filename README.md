@@ -2,7 +2,7 @@
 
 I am building an end-to-end Data Engineering platform in Microsoft Fabric around Barcelona public data.
 
-The project currently implements ingestion, historical processing, incremental Silver loads and a business-ready Gold star schema for Bicing availability analytics.
+The project currently implements REST ingestion, historical Bronze snapshots, incremental Silver processing, a Gold star schema and SQL analytical serving for Bicing availability data.
 
 ## Architecture
 
@@ -24,7 +24,10 @@ CityBikes Bicing API ┘
                     Gold Star Schema
                             │
                             ▼
-              SQL Analytics Endpoint / BI
+                 SQL Analytics Endpoint
+                            │
+                            ▼
+                        Power BI
 ```
 
 See [Architecture](architecture/README.md) for the detailed flow.
@@ -94,6 +97,31 @@ The Gold notebook rebuilds the analytical layer from the validated Silver histor
 
 See [Data Model](docs/data-model.md), [Data Quality](docs/data-quality.md) and [Engineering Decisions](docs/decisions.md).
 
+## SQL Analytics Endpoint
+
+The Gold Delta tables are exposed through the Fabric SQL Analytics Endpoint and queried with T-SQL.
+
+Repository queries:
+
+- `01_gold_star_schema_preview.sql` — joins fact + station/date/time dimensions
+- `02_low_availability_stations.sql` — ranks online stations by average bike availability
+- `03_availability_by_day_period.sql` — aggregates KPIs by day period
+- `04_weekday_vs_weekend.sql` — compares weekday/weekend availability
+- `05_availability_by_day.sql` — aggregates availability by day of week
+- `06_powerbi_serving_query.sql` — denormalized serving query for downstream BI
+
+The serving query combines station, date and time context with Gold measures and derives an `availability_status` using `CASE`:
+
+```text
+Offline
+No capacity
+Low bikes
+Low docks
+Balanced
+```
+
+See [SQL queries](sql/README.md).
+
 ## Data quality
 
 Silver and Gold both include explicit validation.
@@ -123,18 +151,23 @@ Source inconsistencies that are not critical are preserved rather than silently 
 - `17-gold-quality-checks.png`
 - `18-gold-analytical-validation.png`
 
+### SQL analytical serving
+
+- `19-sql-analytics-endpoint.png`
+- `20-sql-serving-query.png`
+
 ![Gold Delta tables](assets/images/16-gold-star-schema-tables.png)
 
-![Gold quality checks](assets/images/17-gold-quality-checks.png)
+![SQL Analytics Endpoint](assets/images/19-sql-analytics-endpoint.png)
 
-![Gold analytical validation](assets/images/18-gold-analytical-validation.png)
+![SQL serving query](assets/images/20-sql-serving-query.png)
 
 ## Current status
 
-**Bronze, historical/incremental Silver and the first Gold analytical star schema are operational.**
+**Bronze, historical/incremental Silver, Gold star-schema modeling and SQL analytical serving are operational.**
 
 Next milestones:
 
-1. Query the Gold model through the Fabric SQL Analytics Endpoint.
-2. Add the final analytical serving and Power BI layer.
+1. Build the Power BI analytical/reporting layer.
+2. Optionally attach Gold processing to the end-to-end Fabric orchestration.
 3. Complete the final architecture diagrams and portfolio documentation.

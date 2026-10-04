@@ -62,7 +62,7 @@ The Gold notebook is currently a downstream analytical build executed separately
 
 ## Gold
 
-Gold is now implemented as a star schema.
+Gold is implemented as a star schema.
 
 ```mermaid
 flowchart TB
@@ -116,7 +116,28 @@ quality checks
 Delta overwrite
 ```
 
-This keeps the analytical model consistent while the dataset is still small and the model is evolving. Gold can be made incremental later if data volume justifies the additional complexity.
+This keeps the analytical model consistent while the dataset is still small and the model is evolving.
+
+## SQL serving layer
+
+Fabric exposes the Gold Delta tables through the Lakehouse SQL Analytics Endpoint.
+
+The SQL layer currently provides:
+
+```text
+Gold Delta tables
+      │
+      ▼
+T-SQL joins and aggregations
+      │
+      ├── station availability ranking
+      ├── day-period analysis
+      ├── weekday/weekend analysis
+      ├── day-of-week analysis
+      └── Power BI serving dataset
+```
+
+The serving query denormalizes the star schema for convenient BI consumption while keeping the physical Gold model dimensional.
 
 ## Context dataset boundary
 
